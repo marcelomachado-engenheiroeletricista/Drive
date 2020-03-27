@@ -1,0 +1,88 @@
+/* Definição das portas de entrada e saída */
+
+const byte gate = 10;                                              // Definição da porta 10 para disparo dos tiristores
+const byte czero = 2;                                              // Definição da porta 2 como interrupção de cruzamento da senoide por 0
+
+void calc(void);
+
+/* Definição de variáveis */
+
+volatile float time1;                                              // Variável para o tempo de disparo do gate                                       
+float e_old   =    0;                                              // Último erro
+float u     =    0;                                                // Valor do compensador
+float u_old =    0;                                                // Último valor do compensador
+
+int ref;                                                           // Referência de velocidade
+int rpm;                                                           // Rotação do motor
+
+float ref1;
+float rpm1;
+float erro;  
+float a;                                                           // Primeira parte do compensador 
+float b;
+
+
+/* Configurações iniciais */
+
+void setup() {
+  pinMode(gate, OUTPUT);                                            // Definindo gate como saída
+  pinMode(czero, INPUT_PULLUP);                                     // Definindo czero como entrada
+  attachInterrupt(digitalPinToInterrupt(czero), blink, RISING);     // Função de interrupção 
+}
+
+
+/* Programa principal */
+
+void loop() {
+
+}
+
+void calc(){
+  ref = analogRead(A6);                                            // Porta analógica para leitura da referência de velocidade                                 
+  rpm = analogRead(A11)-100;                                       // Porta analógica para leitura da velocidade no motor    
+
+  ref1 = ref*(2.323);
+  rpm1 = rpm*(2.323);
+
+  
+  //ref1 = (float)ref * (3.3 / 1023.0);                            // Variável transformação de 1023 bits em valor de tensão
+  //rpm1 = (float)rpm * (3.3 / 1023.0);                            // Variável transformação de 1023 bits em valor de tensão
+  erro = ref1 - rpm1;                                              // Diferença entre valor setado e velocidade do motor
+
+  a = -0.005*e_old;
+  b = 0.005*erro;
+  u = u_old + b + a;
+  
+  //a = erro - 0.000018544*e_old;                                  // Primeira parte do compensador
+  //u = u_old + a;                                                 // Segunda parte do compensador
+  
+  u_old = u;                                                       // Atualização do u_old                             
+  e_old = erro;                                                    // Atualização do e_old
+
+  if(u>1.95)                                                       // Saturação do compensador
+  {
+    u=1.95;
+  }
+  if(u<0.05)
+  {
+    u=0.05;
+  }
+  
+  time1 =  -((u-2)/0.00024096);                                    // Transformação do compensador para tempo em microssegundos
+  
+}
+
+/* Interrupção para disparo */
+
+void blink() {
+  calc();
+  
+                                          
+  delayMicroseconds (time1);                                       // Tempo para disparo do tiristor após senoide cruzar por zero 
+  digitalWrite(gate, HIGH);                                        // Liga saída para disparo 
+  delayMicroseconds (1000);                                        // Tempo que a saída permanece ligada   
+  digitalWrite(gate, LOW);                                         // Desliga saída de disparo  
+}
+
+
+/*FIM*/
